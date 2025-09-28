@@ -1,6 +1,7 @@
 ﻿using System.Collections;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using UnityEngine.UI;
 
 public class PlayerMovement : MonoBehaviour
 {
@@ -13,7 +14,7 @@ public class PlayerMovement : MonoBehaviour
 
     private bool canDash = true;
     private bool isDashing;
-    private float dashingPower = 15f; // Adjust dash power as needed
+    private float dashingPower = 15f;
     private float dashingTime = 0.2f;
 
     private bool isWallJumping;
@@ -32,11 +33,23 @@ public class PlayerMovement : MonoBehaviour
 
     public int Respawn;
 
+   
+    public int startingBananas = 3;
+    private int currentBananas;
+
+    [SerializeField] private Text bananaText; 
+
+    private void Start()
+    {
+        currentBananas = startingBananas;
+        UpdateBananaUI();
+    }
+
     private void Update()
     {
         if (isDashing) return;
 
-        // Horizontal movement via arrow keys
+        
         if (Input.GetKey(KeyCode.RightArrow))
             horizontal = 1f;
         else if (Input.GetKey(KeyCode.LeftArrow))
@@ -44,36 +57,26 @@ public class PlayerMovement : MonoBehaviour
         else
             horizontal = 0f;
 
-        // Update facing based on horizontal input only if not wall jumping
+        
         if (!isWallJumping && horizontal != 0)
-        {
             isFacingRight = horizontal > 0;
-        }
 
-        // Jump on X key
+        
         if (Input.GetKeyDown(KeyCode.X) && IsGrounded())
-        {
             rb.velocity = new Vector2(rb.velocity.x, jumpingPower);
-        }
 
-        // Short jump if X released early
         if (Input.GetKeyUp(KeyCode.X) && rb.velocity.y > 0f)
-        {
             rb.velocity = new Vector2(rb.velocity.x, rb.velocity.y * 0.5f);
-        }
 
-        // Restart scene on R key if needed
-        if (Input.GetKeyDown(KeyCode.R) && canDash)
-        {
+        
+        if (Input.GetKeyDown(KeyCode.R))
             SceneManager.LoadScene(Respawn);
-        }
 
-        // Dash on Z key
-        if (Input.GetKeyDown(KeyCode.Z) && canDash)
+       
+        if (Input.GetKeyDown(KeyCode.Z) && canDash && currentBananas > 0)
         {
             Vector2 dashDir = GetDashDirection();
 
-            // If wall sliding and dash direction is purely vertical, reset horizontal to face direction
             if (isWallSliding && Mathf.Abs(dashDir.x) < 0.1f && Mathf.Abs(dashDir.y) > 0.1f)
             {
                 dashDir.x = isFacingRight ? 1f : -1f;
@@ -87,7 +90,6 @@ public class PlayerMovement : MonoBehaviour
         WallSlide();
         WallJump();
 
-        // Always flip to face movement direction unless wall jumping (flip handled there)
         if (!isWallJumping)
             Flip();
     }
@@ -97,22 +99,15 @@ public class PlayerMovement : MonoBehaviour
         float dashX = 0f;
         float dashY = 0f;
 
-        if (Input.GetKey(KeyCode.RightArrow))
-            dashX += 1f;
-        if (Input.GetKey(KeyCode.LeftArrow))
-            dashX -= 1f;
-        if (Input.GetKey(KeyCode.UpArrow))
-            dashY += 1f;
-        if (Input.GetKey(KeyCode.DownArrow))
-            dashY -= 1f;
+        if (Input.GetKey(KeyCode.RightArrow)) dashX += 1f;
+        if (Input.GetKey(KeyCode.LeftArrow)) dashX -= 1f;
+        if (Input.GetKey(KeyCode.UpArrow)) dashY += 1f;
+        if (Input.GetKey(KeyCode.DownArrow)) dashY -= 1f;
 
         Vector2 dashDirection = new Vector2(dashX, dashY);
 
         if (dashDirection == Vector2.zero)
-        {
-            // No arrow pressed: dash in facing direction horizontally
             dashDirection = isFacingRight ? Vector2.right : Vector2.left;
-        }
 
         return dashDirection.normalized;
     }
@@ -146,14 +141,10 @@ public class PlayerMovement : MonoBehaviour
                 rb.velocity = new Vector2(rb.velocity.x, Mathf.Clamp(rb.velocity.y, -wallSlidingSpeed, float.MaxValue));
             }
             else
-            {
                 isWallSliding = false;
-            }
         }
         else
-        {
             isWallSliding = false;
-        }
     }
 
     private void WallJump()
@@ -176,7 +167,6 @@ public class PlayerMovement : MonoBehaviour
             rb.velocity = new Vector2(wallJumpingDirection * wallJumpingPower.x, wallJumpingPower.y);
             wallJumpingCounter = 0f;
 
-            // Face direction of wall jump
             if (wallJumpingDirection > 0 && !isFacingRight)
             {
                 isFacingRight = true;
@@ -201,25 +191,22 @@ public class PlayerMovement : MonoBehaviour
     {
         Vector3 localScale = transform.localScale;
         if (isFacingRight && localScale.x < 0)
-        {
             FlipCharacterScale();
-        }
         else if (!isFacingRight && localScale.x > 0)
-        {
             FlipCharacterScale();
-        }
-    }
-
-    // ✅ Only one version of FlipCharacterScale remains
-    private void FlipCharacterScale()
-    {
-        Vector3 localScale = transform.localScale;
-        localScale.x *= -1;
-        transform.localScale = localScale;
     }
 
     private IEnumerator Dash(Vector2 direction)
     {
+        currentBananas--;
+        UpdateBananaUI();
+
+        if (currentBananas < 0)
+        {
+            SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+            yield break;
+        }
+
         canDash = false;
         isDashing = true;
         float originalGravity = rb.gravityScale;
@@ -233,31 +220,22 @@ public class PlayerMovement : MonoBehaviour
 
         rb.gravityScale = originalGravity;
         isDashing = false;
-
-        // Allow dash immediately again
         canDash = true;
     }
+
+    private void FlipCharacterScale()
+    {
+        Vector3 localScale = transform.localScale;
+        localScale.x *= -1;
+        transform.localScale = localScale;
+    }
+
+ 
+    private void UpdateBananaUI()
+    {
+        if (bananaText != null)
+            bananaText.text = "x " + Mathf.Max(currentBananas, 0);
+    }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
